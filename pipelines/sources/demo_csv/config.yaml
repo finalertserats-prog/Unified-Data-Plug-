@@ -1,0 +1,8 @@
+pipeline: demo_csv_to_raw
+source_type: csv
+source_path: examples/data/customers.csv
+target_catalog: udp
+target_namespace: raw
+target_table: demo_customers
+primary_key: customer_id
+load_mode: replace_demo

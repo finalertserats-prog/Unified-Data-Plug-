@@ -1,0 +1,26 @@
+name: Validate UDP Package
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  static-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check scripts are present
+        run: |
+          test -f install.sh
+          test -f udp
+          test -f docker-compose.yml
+          test -f jobs/bootstrap_demo_lake.py
+          test -f sql/starrocks/00_create_iceberg_catalog.sql
+      - name: Validate YAML files
+        run: |
+          python - <<'PY'
+          import pathlib, yaml
+          for path in pathlib.Path('.').rglob('*.yaml'):
+              yaml.safe_load(path.read_text())
+              print('OK', path)
+          PY

@@ -1,0 +1,13 @@
+policy: demo_public_analytics
+description: Demo policy for app analytics layer
+roles:
+  analyst:
+    allow:
+      - app_analytics.demo_customer_summary
+    column_masks: {}
+    row_filters: {}
+  viewer:
+    allow:
+      - app_analytics.demo_customer_summary
+    row_filters:
+      app_analytics.demo_customer_summary: "region IS NOT NULL"
