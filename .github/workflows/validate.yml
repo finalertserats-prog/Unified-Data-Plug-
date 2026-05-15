@@ -25,6 +25,12 @@ jobs:
               yaml.safe_load(path.read_text())
               print('OK', path)
           PY
+      - name: docker compose config lint
+        run: |
+          # Use a placeholder .env so interpolation succeeds. Real values come from install.sh.
+          cp .env.example .env
+          docker compose config --quiet
+          rm .env
 
   shellcheck:
     runs-on: ubuntu-latest
@@ -33,7 +39,7 @@ jobs:
       - name: Run shellcheck
         uses: ludeeus/action-shellcheck@2.0.0
         with:
-          severity: error
+          severity: warning
 
   gitleaks:
     runs-on: ubuntu-latest
@@ -57,3 +63,54 @@ jobs:
             echo "ERROR: rendered template found in repo. These are gitignored." >&2
             exit 1
           fi
+
+  pinned-images:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require every image to be digest-pinned
+        run: |
+          # Every `image:` line in compose must contain @sha256:
+          unpinned=$(grep -E '^\s*image:\s+' docker-compose.yml | grep -v '@sha256:' || true)
+          if [ -n "$unpinned" ]; then
+            echo "ERROR: unpinned images in docker-compose.yml:" >&2
+            echo "$unpinned" >&2
+            exit 1
+          fi
+          echo "All compose images are digest-pinned."
+
+  trivy-config:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Trivy — misconfig scan (Dockerfile/Compose/IaC)
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          scan-type: config
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+          ignore-unfixed: true
+
+  trivy-images:
+    runs-on: ubuntu-latest
+    # Image scan is heavy; only run on PR + main branch.
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - minio/minio:RELEASE.2025-04-22T22-12-26Z
+          - tabulario/iceberg-rest:1.6.0
+          - tabulario/spark-iceberg:3.5.1_1.5.0
+          - starrocks/fe-ubuntu:3.3-latest
+          - starrocks/be-ubuntu:3.3-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Trivy — image vuln scan ${{ matrix.image }}
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: ${{ matrix.image }}
+          severity: CRITICAL
+          exit-code: '0'  # report only; do not fail build on upstream image CVEs (yet)
+          ignore-unfixed: true
+          format: table
