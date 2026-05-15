@@ -1,0 +1,6 @@
+customer_id,name,region,order_amount
+1,Alice,APAC,120.50
+2,Bob,EMEA,300.00
+3,Carol,APAC,75.25
+4,Dan,AMER,510.00
+5,Eve,EMEA,180.75

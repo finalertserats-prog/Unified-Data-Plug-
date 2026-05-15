@@ -44,22 +44,45 @@ case "$cmd" in
     ;;
   clean)
     [ -n "$COMPOSE" ] || { echo "Docker Compose not found"; exit 1; }
-    $COMPOSE down -v
+    $COMPOSE --profile ranger down -v
+    ;;
+  ranger)
+    [ -n "$COMPOSE" ] || { echo "Docker Compose not found"; exit 1; }
+    sub="${2:-up}"
+    case "$sub" in
+      up)
+        echo "Starting Ranger admin (first run builds image, ~10 min)..."
+        $COMPOSE --profile ranger up -d --build ranger-postgres ranger-admin
+        echo "Ranger admin: http://localhost:6080 (default user: admin)"
+        ;;
+      down)
+        $COMPOSE --profile ranger stop ranger-admin ranger-postgres
+        ;;
+      logs)
+        $COMPOSE --profile ranger logs -f ranger-admin
+        ;;
+      *)
+        echo "Usage: ./udp ranger [up|down|logs]"
+        exit 1
+        ;;
+    esac
     ;;
   help|*)
     cat <<'EOF'
 Unified Data Plug CLI
 
 Commands:
-  ./udp doctor       Check host requirements
-  ./udp start        Start UDP stack
-  ./udp stop         Stop UDP stack
-  ./udp restart      Restart UDP stack
-  ./udp bootstrap    Create demo raw, curated, and app analytics layer
-  ./udp smoke-test   Validate end-to-end lakehouse readiness
-  ./udp status       Show container status
-  ./udp logs         Tail logs
-  ./udp clean        Stop and remove volumes
+  ./udp doctor          Check host requirements
+  ./udp start           Start core UDP stack (MinIO, HMS, Spark, StarRocks)
+  ./udp stop            Stop UDP stack
+  ./udp restart         Restart UDP stack
+  ./udp bootstrap       Create demo raw, curated, and app analytics layer
+  ./udp smoke-test      Validate end-to-end lakehouse readiness
+  ./udp ranger up       Start optional Apache Ranger admin (governance plane)
+  ./udp ranger down     Stop Ranger admin
+  ./udp status          Show container status
+  ./udp logs            Tail logs
+  ./udp clean           Stop and remove volumes (including Ranger)
 EOF
     ;;
 esac

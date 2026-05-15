@@ -35,26 +35,49 @@ services:
       echo 'MinIO bucket ready';
       "
 
-  iceberg-rest:
-    image: tabulario/iceberg-rest:1.6.0
-    container_name: udp-iceberg-rest
-    depends_on:
-      create-bucket:
-        condition: service_completed_successfully
-    ports:
-      - "8181:8181"
+  hms-postgres:
+    image: postgres:16-alpine
+    container_name: udp-hms-postgres
+    hostname: hms-postgres
     env_file:
       - .env
     environment:
-      CATALOG_WAREHOUSE: ${ICEBERG_WAREHOUSE}
-      CATALOG_IO__IMPL: org.apache.iceberg.aws.s3.S3FileIO
-      CATALOG_S3_ENDPOINT: http://minio:9000
-      CATALOG_S3_PATH__STYLE__ACCESS: "true"
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
-      AWS_REGION: ${AWS_REGION}
+      POSTGRES_USER: ${HMS_DB_USER}
+      POSTGRES_PASSWORD: ${HMS_DB_PASSWORD}
+      POSTGRES_DB: ${HMS_DB_NAME}
+    volumes:
+      - udp_hms_postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8181/v1/config"]
+      test: ["CMD-SHELL", "pg_isready -U $${HMS_DB_USER} -d $${HMS_DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  hive-metastore:
+    image: apache/hive:4.0.0
+    container_name: udp-hive-metastore
+    hostname: hive-metastore
+    depends_on:
+      hms-postgres:
+        condition: service_healthy
+      create-bucket:
+        condition: service_completed_successfully
+    env_file:
+      - .env
+    environment:
+      SERVICE_NAME: metastore
+      DB_DRIVER: postgres
+      SERVICE_OPTS: >-
+        -Djavax.jdo.option.ConnectionDriverName=org.postgresql.Driver
+        -Djavax.jdo.option.ConnectionURL=jdbc:postgresql://hms-postgres:5432/${HMS_DB_NAME}
+        -Djavax.jdo.option.ConnectionUserName=${HMS_DB_USER}
+        -Djavax.jdo.option.ConnectionPassword=${HMS_DB_PASSWORD}
+    ports:
+      - "9083:9083"
+    volumes:
+      - ./config/hive/hive-site.xml:/opt/hive/conf/hive-site.xml
+    healthcheck:
+      test: ["CMD-SHELL", "ss -ltn 2>/dev/null | grep -q ':9083' || netstat -ltn 2>/dev/null | grep -q ':9083'"]
       interval: 10s
       timeout: 5s
       retries: 30
@@ -63,7 +86,7 @@ services:
     image: tabulario/spark-iceberg:3.5.1_1.5.2
     container_name: udp-spark
     depends_on:
-      iceberg-rest:
+      hive-metastore:
         condition: service_healthy
     ports:
       - "8888:8888"
@@ -129,7 +152,50 @@ services:
       timeout: 5s
       retries: 40
 
+  ranger-postgres:
+    image: postgres:16-alpine
+    container_name: udp-ranger-postgres
+    hostname: ranger-postgres
+    profiles: ["ranger"]
+    env_file:
+      - .env
+    environment:
+      POSTGRES_USER: ${RANGER_DB_USER}
+      POSTGRES_PASSWORD: ${RANGER_DB_PASSWORD}
+      POSTGRES_DB: ${RANGER_DB_NAME}
+    volumes:
+      - udp_ranger_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${RANGER_DB_USER} -d $${RANGER_DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  ranger-admin:
+    build:
+      context: ./services/ranger
+      dockerfile: Dockerfile
+    image: udp/ranger-admin:2.4.0
+    container_name: udp-ranger-admin
+    hostname: ranger-admin
+    profiles: ["ranger"]
+    depends_on:
+      ranger-postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      RANGER_DB_HOST: ranger-postgres
+      RANGER_DB_NAME: ${RANGER_DB_NAME}
+      RANGER_DB_USER: ${RANGER_DB_USER}
+      RANGER_DB_PASSWORD: ${RANGER_DB_PASSWORD}
+      RANGER_ADMIN_PASSWORD: ${RANGER_ADMIN_PASSWORD}
+    ports:
+      - "6080:6080"
+
 volumes:
   udp_minio_data:
+  udp_hms_postgres_data:
   udp_starrocks_fe_meta:
   udp_starrocks_be_storage:
+  udp_ranger_postgres_data:
