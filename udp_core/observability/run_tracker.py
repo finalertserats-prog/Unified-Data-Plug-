@@ -24,11 +24,10 @@ from __future__ import annotations
 import contextlib
 import os
 import socket
-import time
 import uuid
+from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Iterator, Optional
 
 
 @dataclass
@@ -36,8 +35,8 @@ class Run:
     run_id: str
     pipeline_name: str
     started_at: datetime
-    rows_in: Optional[int] = None
-    rows_out: Optional[int] = None
+    rows_in: int | None = None
+    rows_out: int | None = None
 
 
 def _now() -> datetime:
@@ -74,10 +73,8 @@ def _emit(sql: str, params: tuple) -> bool:
     except Exception:
         return False
     finally:
-        try:
+        with contextlib.suppress(Exception):
             conn.close()
-        except Exception:
-            pass
 
 
 def record_start(pipeline_name: str) -> Run:
@@ -96,7 +93,7 @@ def record_start(pipeline_name: str) -> Run:
     return run
 
 
-def record_finish(run: Run, status: str, error: Optional[str] = None) -> None:
+def record_finish(run: Run, status: str, error: str | None = None) -> None:
     finished_at = _now()
     # StarRocks DUPLICATE KEY tables don't support UPDATE; insert a "finished"
     # row alongside the "running" row. recent_runs view filters by status.

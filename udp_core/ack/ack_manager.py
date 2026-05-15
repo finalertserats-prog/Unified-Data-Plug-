@@ -1,5 +1,6 @@
 from pathlib import Path
 
+
 class AckManager:
     def __init__(self, root: str):
         self.root = Path(root)
