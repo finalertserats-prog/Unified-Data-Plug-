@@ -10,12 +10,13 @@
 - udp_core skeleton
 
 ## v0.3 (shipped)
-- Iceberg catalog moved to **Hive Metastore** (replaces iceberg-rest)
-  - multi-engine catalog; Ranger-ready; aligns with reference architecture
+- **Two Iceberg catalogs side-by-side** over the same warehouse:
+  - HMS-backed (`udp` / `iceberg_catalog`) — default, Ranger-ready
+  - REST-backed (`udp_rest` / `iceberg_rest_catalog`) — cloud-native
 - **Apache Ranger** as opt-in compose profile (`./udp ranger up`)
   - policy admin plane; enforcement still v0.4
 - demo CSV moved to `examples/customers.csv` (gitignore-safe)
-- updated Spark catalog config, StarRocks external catalog config, doctor checks
+- updated Spark catalog config, StarRocks external catalog SQL, doctor checks
 
 ## v0.4
 - Ranger StarRocks enforcement plugin

@@ -32,7 +32,8 @@ cp .env.example .env
 |---|---|
 | MinIO API | http://localhost:9000 |
 | MinIO Console | http://localhost:9001 |
-| Hive Metastore (Thrift) | thrift://localhost:9083 |
+| Hive Metastore (Thrift) | thrift://localhost:9083  (default Iceberg catalog) |
+| Iceberg REST | http://localhost:8181  (secondary Iceberg catalog) |
 | Spark Notebook | http://localhost:8888 |
 | StarRocks FE UI | http://localhost:8030 |
 | StarRocks MySQL | localhost:9030 |

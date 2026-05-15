@@ -59,6 +59,8 @@ HMS_DB_NAME=metastore
 HMS_DB_USER=hive
 HMS_DB_PASSWORD=hive
 
+ICEBERG_REST_URI=http://iceberg-rest:8181
+
 STARROCKS_HOST=127.0.0.1
 STARROCKS_MYSQL_PORT=9030
 STARROCKS_ROOT_PASSWORD=
@@ -88,7 +90,8 @@ banner "Running smoke test"
 
 banner "UDP installation complete"
 echo "MinIO Console:     http://localhost:9001"
-echo "Hive Metastore:    thrift://localhost:9083"
+echo "Hive Metastore:    thrift://localhost:9083  (default Iceberg catalog)"
+echo "Iceberg REST:      http://localhost:8181    (secondary Iceberg catalog)"
 echo "Spark Notebook:    http://localhost:8888"
 echo "StarRocks FE UI:   http://localhost:8030"
 echo "StarRocks MySQL:   mysql -h 127.0.0.1 -P 9030 -u root"
