@@ -66,6 +66,8 @@ if [ ! -f .env ]; then
   STARROCKS_PASS="$(ask_secret 'StarRocks root password' "$STARROCKS_PASS_GEN")"
   PG_PASS_GEN="$(gen_password)"
   PG_PASS="$(ask_secret 'Postgres (Iceberg catalog) password' "$PG_PASS_GEN")"
+  GRAFANA_PASS_GEN="$(gen_password)"
+  GRAFANA_PASS="$(ask_secret 'Grafana admin password' "$GRAFANA_PASS_GEN")"
 
   umask 077
   cat > .env <<EOF
@@ -90,6 +92,9 @@ STARROCKS_ROOT_PASSWORD=$STARROCKS_PASS
 POSTGRES_USER=iceberg
 POSTGRES_PASSWORD=$PG_PASS
 POSTGRES_DB=iceberg_catalog
+
+GRAFANA_ADMIN_USER=admin
+GRAFANA_ADMIN_PASSWORD=$GRAFANA_PASS
 EOF
   chmod 600 .env
   echo ""

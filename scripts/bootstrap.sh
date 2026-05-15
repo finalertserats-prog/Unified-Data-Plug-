@@ -41,6 +41,9 @@ SHOW BACKENDS;
 ALTER SYSTEM ADD BACKEND 'starrocks-be:9050';
 "
 
+echo "Ensuring pymysql is available in the Spark container (for run tracker)..."
+docker exec udp-spark sh -c "python -c 'import pymysql' 2>/dev/null || pip install --quiet pymysql"
+
 echo "Running Spark demo bootstrap..."
 docker exec udp-spark spark-submit /home/iceberg/jobs/bootstrap_demo_lake.py
 
@@ -49,6 +52,10 @@ docker exec -i udp-starrocks-fe mysql -h 127.0.0.1 -P 9030 -u root "${SR_AUTH[@]
   < sql/starrocks/00_create_iceberg_catalog.sql
 docker exec -i udp-starrocks-fe mysql -h 127.0.0.1 -P 9030 -u root "${SR_AUTH[@]}" \
   < sql/starrocks/01_create_app_analytics.sql
+
+echo "Creating observability schema..."
+docker exec -i udp-starrocks-fe mysql -h 127.0.0.1 -P 9030 -u root "${SR_AUTH[@]}" \
+  < sql/starrocks/03_create_observability.sql
 
 echo "Applying StarRocks RBAC users from policy YAML..."
 docker exec -i udp-starrocks-fe mysql -h 127.0.0.1 -P 9030 -u root "${SR_AUTH[@]}" \

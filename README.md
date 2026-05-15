@@ -57,6 +57,8 @@ not from the LAN. To access from another machine, tunnel via SSH:
 | Spark Notebook | http://127.0.0.1:8888 |
 | StarRocks FE UI | http://127.0.0.1:8030 |
 | StarRocks MySQL | mysql -h 127.0.0.1 -P 9030 -u root -p |
+| Prometheus | http://127.0.0.1:9090 |
+| Grafana | http://127.0.0.1:3000 (admin / see `cat .env`) |
 
 ## Commands
 

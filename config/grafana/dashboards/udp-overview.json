@@ -1,0 +1,57 @@
+{
+  "annotations": {"list": []},
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "type": "stat",
+      "title": "MinIO — Total Buckets",
+      "datasource": {"type": "prometheus", "uid": "udp-prometheus"},
+      "targets": [{"expr": "minio_cluster_bucket_total_count", "refId": "A"}],
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0}
+    },
+    {
+      "type": "stat",
+      "title": "MinIO — Disk Usage",
+      "datasource": {"type": "prometheus", "uid": "udp-prometheus"},
+      "targets": [{"expr": "minio_node_disk_used_bytes", "refId": "A"}],
+      "fieldConfig": {"defaults": {"unit": "bytes"}},
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0}
+    },
+    {
+      "type": "stat",
+      "title": "StarRocks FE — Up",
+      "datasource": {"type": "prometheus", "uid": "udp-prometheus"},
+      "targets": [{"expr": "up{job=\"starrocks_fe\"}", "refId": "A"}],
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0}
+    },
+    {
+      "type": "stat",
+      "title": "StarRocks BE — Up",
+      "datasource": {"type": "prometheus", "uid": "udp-prometheus"},
+      "targets": [{"expr": "up{job=\"starrocks_be\"}", "refId": "A"}],
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0}
+    },
+    {
+      "type": "timeseries",
+      "title": "Scrape success per job",
+      "datasource": {"type": "prometheus", "uid": "udp-prometheus"},
+      "targets": [{"expr": "up", "refId": "A", "legendFormat": "{{job}}"}],
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 4}
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["udp"],
+  "templating": {"list": []},
+  "time": {"from": "now-1h", "to": "now"},
+  "timepicker": {},
+  "timezone": "",
+  "title": "UDP Overview",
+  "uid": "udp-overview",
+  "version": 1,
+  "weekStart": ""
+}
