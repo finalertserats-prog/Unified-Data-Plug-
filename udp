@@ -44,6 +44,17 @@ case "$cmd" in
     ;;
   clean)
     [ -n "$COMPOSE" ] || { echo "Docker Compose not found"; exit 1; }
+    force="${2:-}"
+    if [ "$force" != "--yes" ] && [ "$force" != "-y" ]; then
+      echo "DANGER: 'udp clean' removes ALL volumes — Iceberg metadata, MinIO objects,"
+      echo "        StarRocks tables, demo data — with no backup."
+      echo ""
+      read -r -p "Type 'wipe' to confirm: " confirm || true
+      if [ "$confirm" != "wipe" ]; then
+        echo "Aborted."
+        exit 1
+      fi
+    fi
     $COMPOSE down -v
     ;;
   help|*)
@@ -59,7 +70,8 @@ Commands:
   ./udp smoke-test   Validate end-to-end lakehouse readiness
   ./udp status       Show container status
   ./udp logs         Tail logs
-  ./udp clean        Stop and remove volumes
+  ./udp clean        Stop and remove volumes (DESTRUCTIVE — prompts for 'wipe')
+  ./udp clean --yes  Same, no prompt (use only in scripts)
 EOF
     ;;
 esac

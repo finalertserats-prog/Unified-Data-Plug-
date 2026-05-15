@@ -1,0 +1,14 @@
+title = "UDP gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Allow documented placeholder strings"
+regexes = [
+  '''CHANGE_ME_[A-Z0-9_]+''',
+]
+paths = [
+  '''(?i)\.env\.example$''',
+  '''(?i)\.gitleaks\.toml$''',
+]

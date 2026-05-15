@@ -1,7 +1,21 @@
 .env
+.env.local
 *.log
 __pycache__/
 .pytest_cache/
 .DS_Store
 data/
 tmp/
+
+# Rendered template outputs — generated from *.template, never commit.
+config/spark/spark-defaults.conf
+sql/starrocks/00_create_iceberg_catalog.sql
+
+# Common credential file patterns — block accidental commits.
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+secrets/
+credentials.json

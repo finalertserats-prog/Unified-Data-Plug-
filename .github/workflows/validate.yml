@@ -15,7 +15,8 @@ jobs:
           test -f udp
           test -f docker-compose.yml
           test -f jobs/bootstrap_demo_lake.py
-          test -f sql/starrocks/00_create_iceberg_catalog.sql
+          test -f sql/starrocks/00_create_iceberg_catalog.sql.template
+          test -f config/spark/spark-defaults.conf.template
       - name: Validate YAML files
         run: |
           python - <<'PY'
@@ -24,3 +25,35 @@ jobs:
               yaml.safe_load(path.read_text())
               print('OK', path)
           PY
+
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run shellcheck
+        uses: ludeeus/action-shellcheck@2.0.0
+        with:
+          severity: error
+
+  gitleaks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  no-rendered-templates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Block rendered template artifacts
+        run: |
+          if [ -f config/spark/spark-defaults.conf ] || \
+             [ -f sql/starrocks/00_create_iceberg_catalog.sql ]; then
+            echo "ERROR: rendered template found in repo. These are gitignored." >&2
+            exit 1
+          fi

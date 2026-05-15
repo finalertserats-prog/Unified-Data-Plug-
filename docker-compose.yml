@@ -83,12 +83,16 @@ services:
     image: starrocks/fe-ubuntu:3.3-latest
     container_name: udp-starrocks-fe
     hostname: starrocks-fe
+    env_file:
+      - .env
     command:
       - /bin/bash
       - -c
       - |
         /opt/starrocks/fe/bin/start_fe.sh --daemon
-        until mysql -h 127.0.0.1 -P 9030 -u root -e "SELECT 1" >/dev/null 2>&1; do sleep 2; done
+        until mysql -h 127.0.0.1 -P 9030 -u root \
+          ${STARROCKS_ROOT_PASSWORD:+-p$$STARROCKS_ROOT_PASSWORD} \
+          -e "SELECT 1" >/dev/null 2>&1; do sleep 2; done
         sleep infinity
     ports:
       - "8030:8030"
@@ -97,7 +101,9 @@ services:
     volumes:
       - udp_starrocks_fe_meta:/opt/starrocks/fe/meta
     healthcheck:
-      test: ["CMD-SHELL", "mysql -h 127.0.0.1 -P 9030 -u root -e 'SELECT 1' >/dev/null 2>&1"]
+      test:
+        - "CMD-SHELL"
+        - "mysql -h 127.0.0.1 -P 9030 -u root ${STARROCKS_ROOT_PASSWORD:+-p$$STARROCKS_ROOT_PASSWORD} -e 'SELECT 1' >/dev/null 2>&1"
       interval: 10s
       timeout: 5s
       retries: 40
