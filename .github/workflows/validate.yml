@@ -59,7 +59,8 @@ jobs:
       - name: Block rendered template artifacts
         run: |
           if [ -f config/spark/spark-defaults.conf ] || \
-             [ -f sql/starrocks/00_create_iceberg_catalog.sql ]; then
+             [ -f sql/starrocks/00_create_iceberg_catalog.sql ] || \
+             [ -f sql/starrocks/02_create_users.sql ]; then
             echo "ERROR: rendered template found in repo. These are gitignored." >&2
             exit 1
           fi

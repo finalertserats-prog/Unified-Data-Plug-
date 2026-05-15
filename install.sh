@@ -97,6 +97,9 @@ fi
 
 chmod +x udp scripts/*.sh
 
+banner "Generating StarRocks RBAC from policy YAML"
+python3 scripts/generate-starrocks-users.py
+
 banner "Rendering config templates"
 bash scripts/render-templates.sh
 

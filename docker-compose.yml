@@ -4,8 +4,8 @@ services:
     container_name: udp-minio
     command: server /data --console-address ":9001"
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
     env_file:
       - .env
     environment:
@@ -42,7 +42,7 @@ services:
       create-bucket:
         condition: service_completed_successfully
     ports:
-      - "8181:8181"
+      - "127.0.0.1:8181:8181"
     env_file:
       - .env
     environment:
@@ -67,8 +67,8 @@ services:
       iceberg-rest:
         condition: service_healthy
     ports:
-      - "8888:8888"
-      - "4040:4040"
+      - "127.0.0.1:8888:8888"
+      - "127.0.0.1:4040:4040"
     env_file:
       - .env
     environment:
@@ -96,9 +96,9 @@ services:
           -e "SELECT 1" >/dev/null 2>&1; do sleep 2; done
         sleep infinity
     ports:
-      - "8030:8030"
-      - "9020:9020"
-      - "9030:9030"
+      - "127.0.0.1:8030:8030"
+      - "127.0.0.1:9020:9020"
+      - "127.0.0.1:9030:9030"
     volumes:
       - udp_starrocks_fe_meta:/opt/starrocks/fe/meta
     healthcheck:
@@ -124,10 +124,10 @@ services:
         /opt/starrocks/be/bin/start_be.sh --daemon
         sleep infinity
     ports:
-      - "8040:8040"
-      - "8060:8060"
-      - "9050:9050"
-      - "9060:9060"
+      - "127.0.0.1:8040:8040"
+      - "127.0.0.1:8060:8060"
+      - "127.0.0.1:9050:9050"
+      - "127.0.0.1:9060:9060"
     volumes:
       - udp_starrocks_be_storage:/opt/starrocks/be/storage
     healthcheck:

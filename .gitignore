@@ -10,6 +10,7 @@ tmp/
 # Rendered template outputs — generated from *.template, never commit.
 config/spark/spark-defaults.conf
 sql/starrocks/00_create_iceberg_catalog.sql
+sql/starrocks/02_create_users.sql
 
 # Common credential file patterns — block accidental commits.
 *.pem

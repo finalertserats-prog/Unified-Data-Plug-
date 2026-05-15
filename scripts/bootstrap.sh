@@ -17,7 +17,9 @@ else
   COMPOSE="docker-compose"
 fi
 
-# Re-render templates in case .env or templates changed.
+# Regenerate RBAC SQL from policy YAML (idempotent — reuses .env values), then
+# re-render templates in case .env or templates changed.
+python3 scripts/generate-starrocks-users.py
 bash scripts/render-templates.sh
 
 # Auth flag for mysql — only add -p when STARROCKS_ROOT_PASSWORD is set.
@@ -47,5 +49,9 @@ docker exec -i udp-starrocks-fe mysql -h 127.0.0.1 -P 9030 -u root "${SR_AUTH[@]
   < sql/starrocks/00_create_iceberg_catalog.sql
 docker exec -i udp-starrocks-fe mysql -h 127.0.0.1 -P 9030 -u root "${SR_AUTH[@]}" \
   < sql/starrocks/01_create_app_analytics.sql
+
+echo "Applying StarRocks RBAC users from policy YAML..."
+docker exec -i udp-starrocks-fe mysql -h 127.0.0.1 -P 9030 -u root "${SR_AUTH[@]}" \
+  < sql/starrocks/02_create_users.sql
 
 echo "UDP bootstrap complete"
