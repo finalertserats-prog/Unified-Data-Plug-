@@ -64,6 +64,8 @@ if [ ! -f .env ]; then
   MINIO_BUCKET="$(ask_default 'Lake bucket name' 'datalake')"
   STARROCKS_PASS_GEN="$(gen_password)"
   STARROCKS_PASS="$(ask_secret 'StarRocks root password' "$STARROCKS_PASS_GEN")"
+  PG_PASS_GEN="$(gen_password)"
+  PG_PASS="$(ask_secret 'Postgres (Iceberg catalog) password' "$PG_PASS_GEN")"
 
   umask 077
   cat > .env <<EOF
@@ -84,6 +86,10 @@ ICEBERG_REST_URI=http://iceberg-rest:8181
 STARROCKS_HOST=127.0.0.1
 STARROCKS_MYSQL_PORT=9030
 STARROCKS_ROOT_PASSWORD=$STARROCKS_PASS
+
+POSTGRES_USER=iceberg
+POSTGRES_PASSWORD=$PG_PASS
+POSTGRES_DB=iceberg_catalog
 EOF
   chmod 600 .env
   echo ""

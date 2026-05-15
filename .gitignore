@@ -6,6 +6,7 @@ __pycache__/
 .DS_Store
 data/
 tmp/
+backups/
 
 # Rendered template outputs — generated from *.template, never commit.
 config/spark/spark-defaults.conf

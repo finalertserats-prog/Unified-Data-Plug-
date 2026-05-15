@@ -39,10 +39,15 @@ for port in 9000 9001 8181 8888 8030 9030; do
 done
 
 mem_kb="$(awk '/MemTotal/ {print $2}' /proc/meminfo 2>/dev/null || echo 0)"
-if [ "$mem_kb" -lt 7000000 ]; then
-  echo "WARN: less than 8GB RAM detected. UDP may run slowly."
+# Compose stack now has resource limits totaling ~14GB across services.
+# Below 16GB on the host, expect contention / swap thrash.
+if [ "$mem_kb" -lt 15000000 ]; then
+  echo "WARN: less than 16GB RAM detected. UDP compose limits total ~14GB; expect contention."
 else
-  echo "OK: RAM looks sufficient"
+  echo "OK: RAM looks sufficient (compose stack budgeted at ~14GB)"
 fi
+
+# Port 5432 added for Postgres in Phase 2 — but Postgres is internal-only
+# (no host port exposed), so we don't probe it here.
 
 exit "$fail"

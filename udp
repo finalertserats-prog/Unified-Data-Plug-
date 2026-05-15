@@ -42,6 +42,13 @@ case "$cmd" in
     [ -n "$COMPOSE" ] || { echo "Docker Compose not found"; exit 1; }
     $COMPOSE logs -f "${2:-}"
     ;;
+  backup)
+    bash scripts/backup.sh "${2:-}"
+    ;;
+  restore)
+    [ -n "${2:-}" ] || { echo "Usage: ./udp restore <backup-dir>"; exit 1; }
+    bash scripts/restore.sh "$2"
+    ;;
   clean)
     [ -n "$COMPOSE" ] || { echo "Docker Compose not found"; exit 1; }
     force="${2:-}"
@@ -70,6 +77,8 @@ Commands:
   ./udp smoke-test   Validate end-to-end lakehouse readiness
   ./udp status       Show container status
   ./udp logs         Tail logs
+  ./udp backup       Snapshot Postgres + MinIO + StarRocks FE metadata
+  ./udp restore <d>  Restore from a backup directory
   ./udp clean        Stop and remove volumes (DESTRUCTIVE — prompts for 'wipe')
   ./udp clean --yes  Same, no prompt (use only in scripts)
 EOF

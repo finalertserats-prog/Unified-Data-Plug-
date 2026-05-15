@@ -13,6 +13,11 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     volumes:
       - udp_minio_data:/data
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
     healthcheck:
       test: ["CMD", "mc", "ready", "local"]
       interval: 10s
@@ -35,17 +40,46 @@ services:
       echo 'MinIO bucket ready';
       "
 
+  postgres:
+    image: postgres:16-alpine@sha256:890480b08124ce7f79960a9bb16fe39729aa302bd384bfd7c408fee6c8f7adb7
+    container_name: udp-postgres
+    env_file:
+      - .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-iceberg}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-iceberg_catalog}
+    volumes:
+      - udp_postgres_data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-iceberg} -d ${POSTGRES_DB:-iceberg_catalog}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
   iceberg-rest:
     image: tabulario/iceberg-rest:1.6.0@sha256:3b7d31bdfec626b68e97531c9778a1b9119659e456fe28545a49f6aa6a9ce472
     container_name: udp-iceberg-rest
     depends_on:
       create-bucket:
         condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
     ports:
       - "127.0.0.1:8181:8181"
     env_file:
       - .env
     environment:
+      # JDBC-backed catalog (durable across container restarts).
+      CATALOG_CATALOG__IMPL: org.apache.iceberg.jdbc.JdbcCatalog
+      CATALOG_URI: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-iceberg_catalog}
+      CATALOG_JDBC_USER: ${POSTGRES_USER:-iceberg}
+      CATALOG_JDBC_PASSWORD: ${POSTGRES_PASSWORD}
       CATALOG_WAREHOUSE: ${ICEBERG_WAREHOUSE}
       CATALOG_IO__IMPL: org.apache.iceberg.aws.s3.S3FileIO
       CATALOG_S3_ENDPOINT: http://minio:9000
@@ -53,6 +87,11 @@ services:
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
       AWS_REGION: ${AWS_REGION}
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8181/v1/config"]
       interval: 10s
@@ -79,6 +118,11 @@ services:
       - ./jobs:/home/iceberg/jobs
       - ./examples:/home/iceberg/examples
       - ./config/spark/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
+    deploy:
+      resources:
+        limits:
+          cpus: "4.0"
+          memory: 4G
 
   starrocks-fe:
     image: starrocks/fe-ubuntu:3.3-latest@sha256:2ef2ef7545b0cd852bcb6e1f1ba0921b630be48b3517ce5422cc83aa490bafd9
@@ -101,6 +145,11 @@ services:
       - "127.0.0.1:9030:9030"
     volumes:
       - udp_starrocks_fe_meta:/opt/starrocks/fe/meta
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
     healthcheck:
       test:
         - "CMD-SHELL"
@@ -130,6 +179,11 @@ services:
       - "127.0.0.1:9060:9060"
     volumes:
       - udp_starrocks_be_storage:/opt/starrocks/be/storage
+    deploy:
+      resources:
+        limits:
+          cpus: "4.0"
+          memory: 4G
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8040/api/health || exit 1"]
       interval: 10s
@@ -138,5 +192,6 @@ services:
 
 volumes:
   udp_minio_data:
+  udp_postgres_data:
   udp_starrocks_fe_meta:
   udp_starrocks_be_storage:
