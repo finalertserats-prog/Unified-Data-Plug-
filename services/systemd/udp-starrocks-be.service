@@ -1,0 +1,20 @@
+[Unit]
+Description=UDP StarRocks Backend
+After=network-online.target udp-starrocks-fe.service
+Wants=network-online.target
+
+[Service]
+Type=forking
+User=udp
+Group=udp
+EnvironmentFile=/etc/udp/udp.env
+Environment=JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+WorkingDirectory=/opt/udp/starrocks/be
+ExecStart=/opt/udp/starrocks/be/bin/start_be.sh --daemon
+ExecStop=/opt/udp/starrocks/be/bin/stop_be.sh
+Restart=on-failure
+RestartSec=10
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

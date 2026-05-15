@@ -1,0 +1,19 @@
+[Unit]
+Description=UDP Apache Hive Metastore (Iceberg catalog)
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=udp
+Group=udp
+EnvironmentFile=/etc/udp/udp.env
+Environment=HIVE_HOME=/opt/udp/hive
+Environment=JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+ExecStart=/opt/udp/hive/bin/hive --service metastore
+Restart=always
+RestartSec=5
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
