@@ -52,12 +52,21 @@ AWS_ACCESS_KEY_ID=$MINIO_USER
 AWS_SECRET_ACCESS_KEY=$MINIO_PASS
 AWS_REGION=us-east-1
 S3_ENDPOINT=http://minio:9000
-ICEBERG_WAREHOUSE=s3://$MINIO_BUCKET/warehouse
-ICEBERG_REST_URI=http://iceberg-rest:8181
+ICEBERG_WAREHOUSE=s3a://$MINIO_BUCKET/warehouse
+
+HMS_URI=thrift://hive-metastore:9083
+HMS_DB_NAME=metastore
+HMS_DB_USER=hive
+HMS_DB_PASSWORD=hive
 
 STARROCKS_HOST=127.0.0.1
 STARROCKS_MYSQL_PORT=9030
 STARROCKS_ROOT_PASSWORD=
+
+RANGER_DB_NAME=ranger
+RANGER_DB_USER=ranger
+RANGER_DB_PASSWORD=ranger
+RANGER_ADMIN_PASSWORD=$MINIO_PASS
 EOF
 else
   echo ".env already exists; keeping existing config."
@@ -79,9 +88,13 @@ banner "Running smoke test"
 
 banner "UDP installation complete"
 echo "MinIO Console:     http://localhost:9001"
-echo "Iceberg REST:      http://localhost:8181"
+echo "Hive Metastore:    thrift://localhost:9083"
+echo "Spark Notebook:    http://localhost:8888"
 echo "StarRocks FE UI:   http://localhost:8030"
 echo "StarRocks MySQL:   mysql -h 127.0.0.1 -P 9030 -u root"
+echo ""
+echo "Optional governance plane:"
+echo "  ./udp ranger up      # Apache Ranger at http://localhost:6080"
 echo ""
 echo "Try:"
 echo "  ./udp status"

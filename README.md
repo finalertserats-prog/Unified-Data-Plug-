@@ -2,12 +2,14 @@
 
 **Unified Data Plug (UDP)** is a plug-and-play, Docker-based, AI-ready open lakehouse starter.
 
-UDP creates a working data lakehouse with:
+Iceberg is the core of the lake. UDP creates a working data lakehouse with:
 
-- **Apache Iceberg** as the raw and curated table layer
+- **Apache Iceberg** as the raw and curated table format
+- **Hive Metastore** as the Iceberg catalog (multi-engine, Ranger-ready)
 - **MinIO/S3** as object storage
 - **Spark** for ingestion and transformation
 - **StarRocks** as the application and analytics serving layer
+- **Apache Ranger** as the optional governance plane (opt-in compose profile)
 - **Demo raw, curated, and analytics datasets** created during bootstrap
 - **Smoke tests** to prove the lakehouse is ready
 
@@ -19,14 +21,6 @@ cd Unified-Data-Plug-
 bash install.sh
 ```
 
-Or after downloading the package:
-
-```bash
-unzip unified-data-plug-v0.2.zip
-cd unified-data-plug-v0.2
-bash install.sh
-```
-
 ## What install does
 
 The installer asks only necessary questions, generates `.env`, checks Docker, starts the stack, bootstraps the demo lake, and runs smoke tests.
@@ -35,10 +29,10 @@ The installer asks only necessary questions, generates `.env`, checks Docker, st
 install.sh
   ├─ check Docker
   ├─ generate .env
-  ├─ start MinIO, Iceberg REST, Spark, StarRocks
-  ├─ create demo raw Iceberg table
+  ├─ start MinIO, Hive Metastore (+Postgres), Spark, StarRocks
+  ├─ create demo raw Iceberg table (registered in HMS)
   ├─ create demo curated Iceberg table
-  ├─ create StarRocks Iceberg catalog
+  ├─ create StarRocks Iceberg external catalog (HMS-backed)
   ├─ create analytics database/views
   └─ run smoke tests
 ```
@@ -49,18 +43,20 @@ install.sh
 |---|---|
 | MinIO API | http://localhost:9000 |
 | MinIO Console | http://localhost:9001 |
-| Iceberg REST | http://localhost:8181 |
+| Hive Metastore (Thrift) | thrift://localhost:9083 |
 | Spark Notebook | http://localhost:8888 |
 | StarRocks FE UI | http://localhost:8030 |
 | StarRocks MySQL | localhost:9030 |
+| Ranger Admin (optional) | http://localhost:6080 |
 
 ## Commands
 
 ```bash
 ./udp doctor
-./udp start
+./udp start            # core stack
 ./udp bootstrap
 ./udp smoke-test
+./udp ranger up        # optional governance plane
 ./udp stop
 ./udp logs
 ./udp status
@@ -78,13 +74,13 @@ make smoke-test
 ## Demo data flow
 
 ```text
-examples/data/customers.csv
-        ↓
-Iceberg raw.demo_customers
-        ↓
+examples/customers.csv
+        ↓ Spark
+Iceberg raw.demo_customers          (registered in Hive Metastore)
+        ↓ Spark
 Iceberg curated.demo_customer_summary
-        ↓
-StarRocks app_analytics.vw_demo_customer_summary
+        ↓ StarRocks Iceberg catalog (HMS-backed)
+StarRocks app_analytics.demo_customer_summary
 ```
 
 ## Repository structure
@@ -102,10 +98,23 @@ udp_core/
 semantic/
 governance/
 observability/
+services/ranger/
 docs/
 examples/
 ```
 
+## Ranger (v0.3 preview)
+
+Apache Ranger ships as an opt-in compose profile and provides the policy-admin plane only. Enforcement against StarRocks is on the v0.4 roadmap.
+
+```bash
+./udp ranger up
+# Open http://localhost:6080
+# First run builds the Ranger admin image from upstream source (~10 min).
+```
+
+See `services/ranger/README.md` for details and known limitations.
+
 ## Production note
 
-UDP v0.2 is a plug-and-play foundation. For production, configure secure credentials, persistent external storage, TLS, backup, monitoring, and access control.
+UDP v0.3 is a plug-and-play foundation. For production, configure secure credentials, persistent external storage, TLS, backup, monitoring, and access control.
