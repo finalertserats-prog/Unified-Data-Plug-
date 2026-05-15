@@ -49,6 +49,9 @@ case "$cmd" in
     [ -n "${2:-}" ] || { echo "Usage: ./udp restore <backup-dir>"; exit 1; }
     bash scripts/restore.sh "$2"
     ;;
+  dr-drill)
+    bash scripts/dr-drill.sh
+    ;;
   clean)
     [ -n "$COMPOSE" ] || { echo "Docker Compose not found"; exit 1; }
     force="${2:-}"
@@ -79,6 +82,7 @@ Commands:
   ./udp logs         Tail logs
   ./udp backup       Snapshot Postgres + MinIO + StarRocks FE metadata
   ./udp restore <d>  Restore from a backup directory
+  ./udp dr-drill     End-to-end backup → wipe → restore → smoke-test drill
   ./udp clean        Stop and remove volumes (DESTRUCTIVE — prompts for 'wipe')
   ./udp clean --yes  Same, no prompt (use only in scripts)
 EOF

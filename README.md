@@ -120,6 +120,16 @@ ports to localhost. **Before deploying outside a trusted local network, read
 [docs/security.md](docs/security.md)** — it documents what is and isn't
 protected today and the production-deploy checklist.
 
+## Documentation
+
+- [docs/architecture.md](docs/architecture.md) — flow and component map
+- [docs/install.md](docs/install.md) — install paths
+- [docs/security.md](docs/security.md) — threat model + production checklist
+- [docs/persistence.md](docs/persistence.md) — what gets persisted + backup/restore
+- [docs/operations.md](docs/operations.md) — day-2 runbooks + DR drill
+- [docs/upgrade.md](docs/upgrade.md) — version-upgrade procedure
+- [docs/roadmap.md](docs/roadmap.md) — release plan
+
 ## Production note
 
 UDP is a plug-and-play foundation. Production deploys still require external
