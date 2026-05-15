@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if docker compose version >/dev/null 2>&1; then
+  COMPOSE="docker compose"
+elif command -v docker-compose >/dev/null 2>&1; then
+  COMPOSE="docker-compose"
+else
+  COMPOSE=""
+fi
+
+cmd="${1:-help}"
+
+case "$cmd" in
+  doctor)
+    bash scripts/doctor.sh
+    ;;
+  start)
+    [ -n "$COMPOSE" ] || { echo "Docker Compose not found"; exit 1; }
+    $COMPOSE up -d
+    ;;
+  stop)
+    [ -n "$COMPOSE" ] || { echo "Docker Compose not found"; exit 1; }
+    $COMPOSE down
+    ;;
+  restart)
+    [ -n "$COMPOSE" ] || { echo "Docker Compose not found"; exit 1; }
+    $COMPOSE down
+    $COMPOSE up -d
+    ;;
+  bootstrap)
+    bash scripts/bootstrap.sh
+    ;;
+  smoke-test)
+    bash scripts/smoke-test.sh
+    ;;
+  status)
+    [ -n "$COMPOSE" ] || { echo "Docker Compose not found"; exit 1; }
+    $COMPOSE ps
+    ;;
+  logs)
+    [ -n "$COMPOSE" ] || { echo "Docker Compose not found"; exit 1; }
+    $COMPOSE logs -f "${2:-}"
+    ;;
+  clean)
+    [ -n "$COMPOSE" ] || { echo "Docker Compose not found"; exit 1; }
+    $COMPOSE down -v
+    ;;
+  help|*)
+    cat <<'EOF'
+Unified Data Plug CLI
+
+Commands:
+  ./udp doctor       Check host requirements
+  ./udp start        Start UDP stack
+  ./udp stop         Stop UDP stack
+  ./udp restart      Restart UDP stack
+  ./udp bootstrap    Create demo raw, curated, and app analytics layer
+  ./udp smoke-test   Validate end-to-end lakehouse readiness
+  ./udp status       Show container status
+  ./udp logs         Tail logs
+  ./udp clean        Stop and remove volumes
+EOF
+    ;;
+esac

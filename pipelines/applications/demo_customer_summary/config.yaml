@@ -1,0 +1,9 @@
+pipeline: demo_raw_to_curated
+source_table: udp.raw.demo_customers
+target_table: udp.curated.demo_customer_summary
+load_mode: replace_demo
+metrics:
+  - customer_count
+  - total_order_amount
+dimensions:
+  - region
