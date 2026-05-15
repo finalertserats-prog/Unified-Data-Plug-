@@ -5,10 +5,12 @@
 Iceberg is the core of the lake. UDP creates a working data lakehouse with:
 
 - **Apache Iceberg** as the raw and curated table format
-- **Hive Metastore** as the Iceberg catalog (multi-engine, Ranger-ready)
+- **Two Iceberg catalogs side-by-side** over the same warehouse:
+  - **Hive Metastore** (default, `udp` catalog) — multi-engine, Ranger-ready
+  - **Iceberg REST** (`udp_rest` catalog) — cloud-native, language-agnostic
 - **MinIO/S3** as object storage
 - **Spark** for ingestion and transformation
-- **StarRocks** as the application and analytics serving layer
+- **StarRocks** as the application and analytics serving layer (both catalogs registered)
 - **Apache Ranger** as the optional governance plane (opt-in compose profile)
 - **Demo raw, curated, and analytics datasets** created during bootstrap
 - **Smoke tests** to prove the lakehouse is ready
@@ -29,10 +31,10 @@ The installer asks only necessary questions, generates `.env`, checks Docker, st
 install.sh
   ├─ check Docker
   ├─ generate .env
-  ├─ start MinIO, Hive Metastore (+Postgres), Spark, StarRocks
-  ├─ create demo raw Iceberg table (registered in HMS)
+  ├─ start MinIO, Hive Metastore (+Postgres), Iceberg REST, Spark, StarRocks
+  ├─ create demo raw Iceberg table (in default HMS catalog)
   ├─ create demo curated Iceberg table
-  ├─ create StarRocks Iceberg external catalog (HMS-backed)
+  ├─ register both StarRocks external catalogs (iceberg_catalog, iceberg_rest_catalog)
   ├─ create analytics database/views
   └─ run smoke tests
 ```
@@ -43,7 +45,8 @@ install.sh
 |---|---|
 | MinIO API | http://localhost:9000 |
 | MinIO Console | http://localhost:9001 |
-| Hive Metastore (Thrift) | thrift://localhost:9083 |
+| Hive Metastore (Thrift) | thrift://localhost:9083  (default Iceberg catalog) |
+| Iceberg REST | http://localhost:8181  (secondary Iceberg catalog) |
 | Spark Notebook | http://localhost:8888 |
 | StarRocks FE UI | http://localhost:8030 |
 | StarRocks MySQL | localhost:9030 |

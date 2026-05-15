@@ -30,7 +30,7 @@ else
   fail=1
 fi
 
-for port in 9000 9001 9083 8888 8030 9030 6080; do
+for port in 9000 9001 8181 9083 8888 8030 9030 6080; do
   if command -v lsof >/dev/null 2>&1 && lsof -i ":$port" >/dev/null 2>&1; then
     echo "WARN: port $port appears to be in use"
   else
