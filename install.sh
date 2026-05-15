@@ -40,6 +40,21 @@ gen_password() {
   fi
 }
 
+gen_fernet_key() {
+  # Airflow Fernet key — base64-encoded 32 bytes. The cryptography library is
+  # the canonical generator; falls back to openssl base64 of 32 urandom bytes
+  # which is wire-compatible with Fernet's expected key shape.
+  if command -v python3 >/dev/null 2>&1 && \
+     python3 -c "from cryptography.fernet import Fernet" 2>/dev/null; then
+    python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+  elif command -v openssl >/dev/null 2>&1; then
+    openssl rand -base64 32 | tr '+/' '-_' | tr -d '='
+  else
+    echo "ERROR: need python+cryptography or openssl to generate Fernet key" >&2
+    exit 1
+  fi
+}
+
 banner "Unified Data Plug installer"
 
 if ! command -v docker >/dev/null 2>&1; then
@@ -69,6 +84,23 @@ if [ ! -f .env ]; then
   GRAFANA_PASS_GEN="$(gen_password)"
   GRAFANA_PASS="$(ask_secret 'Grafana admin password' "$GRAFANA_PASS_GEN")"
 
+  echo ""
+  echo "Choose your orchestrator. Compose profiles will start only the services you pick:"
+  echo "  airflow   — Apache Airflow (LocalExecutor + webserver + scheduler)"
+  echo "  dagster   — Dagster (asset-first, single dev container with Postgres backing)"
+  echo "  none      — skip orchestrator services entirely"
+  ORCH="$(ask_default 'Orchestrator' 'airflow')"
+  case "$ORCH" in
+    airflow|dagster|none) ;;
+    *) echo "Unrecognized: $ORCH. Defaulting to airflow."; ORCH=airflow ;;
+  esac
+
+  # Always generate credentials for both — keeps switching later painless.
+  AIRFLOW_PASS_GEN="$(gen_password)"
+  AIRFLOW_PASS="$(ask_secret 'Airflow admin password' "$AIRFLOW_PASS_GEN")"
+  AIRFLOW_FERNET="$(gen_fernet_key)"
+  AIRFLOW_WEB_SECRET="$(gen_password)"
+
   umask 077
   cat > .env <<EOF
 UDP_PROJECT_NAME=unified-data-plug
@@ -95,6 +127,19 @@ POSTGRES_DB=iceberg_catalog
 
 GRAFANA_ADMIN_USER=admin
 GRAFANA_ADMIN_PASSWORD=$GRAFANA_PASS
+
+AIRFLOW_ADMIN_USER=admin
+AIRFLOW_ADMIN_PASSWORD=$AIRFLOW_PASS
+AIRFLOW_ADMIN_EMAIL=admin@udp.local
+AIRFLOW_DB=airflow_meta
+AIRFLOW_FERNET_KEY=$AIRFLOW_FERNET
+AIRFLOW_WEBSERVER_SECRET_KEY=$AIRFLOW_WEB_SECRET
+
+DAGSTER_DB=dagster_meta
+
+# Customization choices recorded at install time. Switch by editing this line
+# and re-running ./udp restart. Allowed: airflow | dagster | none
+UDP_ORCHESTRATOR=$ORCH
 EOF
   chmod 600 .env
   echo ""

@@ -93,6 +93,58 @@ jobs:
           exit-code: '1'
           ignore-unfixed: true
 
+  dag-validity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install minimal Airflow + provider
+        run: |
+          python -m pip install --upgrade pip
+          # Constraints file pins the exact Airflow dep tree for 2.10.3+py3.11.
+          CONSTRAINTS="https://raw.githubusercontent.com/apache/airflow/constraints-2.10.3/constraints-3.11.txt"
+          pip install "apache-airflow==2.10.3" docker==7.1.0 --constraint "$CONSTRAINTS"
+      - name: Import every DAG via DagBag
+        run: |
+          python - <<'PY'
+          import sys
+          from airflow.models import DagBag
+          bag = DagBag(dag_folder="airflow/dags", include_examples=False)
+          if bag.import_errors:
+              print("DAG import errors:")
+              for path, err in bag.import_errors.items():
+                  print(f"  {path}: {err}")
+              sys.exit(1)
+          print(f"Loaded {len(bag.dags)} DAGs: {sorted(bag.dags)}")
+          PY
+
+  dagster-validity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Dagster
+        run: |
+          python -m pip install --upgrade pip
+          pip install "dagster==1.9.0" "dagster-webserver==1.9.0" "docker==7.1.0" "pyyaml==6.0.2"
+      - name: Load Definitions
+        run: |
+          python - <<'PY'
+          import sys
+          sys.path.insert(0, ".")
+          from dagster_project.definitions import defs
+          assets = list(defs.get_asset_graph().asset_dep_graph["upstream"])
+          print(f"Loaded {len(assets)} asset(s):", assets)
+          jobs = [j.name for j in defs.get_all_job_defs()]
+          print(f"Loaded {len(jobs)} job(s):", jobs)
+          schedules = [s.name for s in defs.schedules or []]
+          print(f"Loaded {len(schedules)} schedule(s):", schedules)
+          PY
+
   python-tests:
     runs-on: ubuntu-latest
     steps:

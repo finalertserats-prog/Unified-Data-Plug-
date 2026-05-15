@@ -9,6 +9,15 @@ else
   COMPOSE=""
 fi
 
+# Honor install-time orchestrator choice via Compose profiles.
+# COMPOSE_PROFILES is read natively by docker compose v2.
+if [ -f .env ]; then
+  ORCH=$(grep '^UDP_ORCHESTRATOR=' .env 2>/dev/null | cut -d= -f2- || true)
+  if [ -n "${ORCH:-}" ] && [ "$ORCH" != "none" ]; then
+    export COMPOSE_PROFILES="$ORCH"
+  fi
+fi
+
 cmd="${1:-help}"
 
 case "$cmd" in

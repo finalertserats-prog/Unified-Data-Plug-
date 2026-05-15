@@ -59,6 +59,7 @@ not from the LAN. To access from another machine, tunnel via SSH:
 | StarRocks MySQL | mysql -h 127.0.0.1 -P 9030 -u root -p |
 | Prometheus | http://127.0.0.1:9090 |
 | Grafana | http://127.0.0.1:3000 (admin / see `cat .env`) |
+| Airflow | http://127.0.0.1:8080 (admin / see `cat .env`) |
 
 ## Commands
 
@@ -128,6 +129,8 @@ protected today and the production-deploy checklist.
 - [docs/persistence.md](docs/persistence.md) — what gets persisted + backup/restore
 - [docs/operations.md](docs/operations.md) — day-2 runbooks + DR drill
 - [docs/upgrade.md](docs/upgrade.md) — version-upgrade procedure
+- [docs/orchestration.md](docs/orchestration.md) — Airflow or Dagster, install-time choice
+- [docs/customization.md](docs/customization.md) — the configurable-lakehouse model
 - [docs/roadmap.md](docs/roadmap.md) — release plan
 
 ## Production note
