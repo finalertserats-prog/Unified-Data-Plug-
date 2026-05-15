@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Stop Git Bash on Windows from rewriting absolute container-side paths like
+# "/home/iceberg/jobs/x.py" into "C:/Program Files/Git/home/iceberg/jobs/x.py"
+# when passed as positional args to `docker exec`.
+export MSYS_NO_PATHCONV=1
+
 UDP_HOME="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$UDP_HOME"
 
@@ -34,12 +39,18 @@ bash scripts/wait-for.sh "StarRocks FE" \
   docker exec udp-starrocks-fe mysql -h 127.0.0.1 -P 9030 -u root "${SR_AUTH[@]}" -e "SELECT 1"
 
 echo "Registering StarRocks backend if needed..."
-docker exec udp-starrocks-fe mysql -h 127.0.0.1 -P 9030 -u root "${SR_AUTH[@]}" -e "
-SHOW BACKENDS;
-" 2>&1 | grep -q "starrocks-be:9050" || \
-  docker exec udp-starrocks-fe mysql -h 127.0.0.1 -P 9030 -u root "${SR_AUTH[@]}" -e "
-ALTER SYSTEM ADD BACKEND 'starrocks-be:9050';
-"
+# StarRocks SHOW BACKENDS reports by IP, not by hostname, so a hostname grep
+# can't reliably tell whether the BE is already registered. Just attempt the
+# ALTER SYSTEM and treat "already exists" as success — the registration is
+# durable and we don't want re-runs to fail on it.
+add_be_out=$(docker exec udp-starrocks-fe mysql -h 127.0.0.1 -P 9030 -u root "${SR_AUTH[@]}" \
+  -e "ALTER SYSTEM ADD BACKEND 'starrocks-be:9050';" 2>&1) || true
+if echo "$add_be_out" | grep -qE "already exists|Query OK|^$"; then
+  echo "  BE registered (or already was)"
+else
+  echo "ERROR registering BE: $add_be_out" >&2
+  exit 1
+fi
 
 echo "Ensuring pymysql is available in the Spark container (for run tracker)..."
 docker exec udp-spark sh -c "python -c 'import pymysql' 2>/dev/null || pip install --quiet pymysql"

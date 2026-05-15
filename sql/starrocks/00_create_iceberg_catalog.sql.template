@@ -4,9 +4,17 @@ PROPERTIES
     "type" = "iceberg",
     "iceberg.catalog.type" = "rest",
     "iceberg.catalog.uri" = "${ICEBERG_REST_URI}",
+    "iceberg.catalog.warehouse" = "${ICEBERG_WAREHOUSE}",
+    -- StarRocks-native S3 props (used by StarRocks's own S3 client).
     "aws.s3.endpoint" = "${S3_ENDPOINT}",
     "aws.s3.access_key" = "${AWS_ACCESS_KEY_ID}",
     "aws.s3.secret_key" = "${AWS_SECRET_ACCESS_KEY}",
     "aws.s3.enable_path_style_access" = "true",
-    "aws.s3.region" = "${AWS_REGION}"
+    "aws.s3.region" = "${AWS_REGION}",
+    -- Iceberg-native S3 props (used by the Iceberg AWS SDK v2 that reads
+    -- manifests). Both sets are required for MinIO; without these, queries
+    -- fail with HTTP 301 Moved Permanently because the SDK uses
+    -- virtual-hosted-style URLs by default.
+    "s3.endpoint" = "${S3_ENDPOINT}",
+    "s3.path-style-access" = "true"
 );

@@ -94,7 +94,10 @@ services:
           cpus: "1.0"
           memory: 1G
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8181/v1/config"]
+      # tabulario/iceberg-rest:1.6.0 ships no wget/curl/nc — use bash /dev/tcp
+      # to confirm the port is accepting connections. Iceberg REST opens the
+      # listener only after JdbcCatalog init succeeds, so port-open == ready.
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/8181"]
       interval: 10s
       timeout: 5s
       retries: 30
@@ -136,6 +139,14 @@ services:
       - /bin/bash
       - -c
       - |
+        # Use the container hostname (starrocks-fe) for FE identity instead
+        # of the bridge-assigned IP. Without this, the FE persists
+        # "name=<ip>_9010_..." in meta/image/ROLE and refuses to start when
+        # the container IP changes across restarts (which it does on Docker
+        # bridge networks). FQDN mode keeps the identity stable.
+        if ! grep -q '^enable_fqdn_mode' /opt/starrocks/fe/conf/fe.conf; then
+          echo "enable_fqdn_mode = true" >> /opt/starrocks/fe/conf/fe.conf
+        fi
         /opt/starrocks/fe/bin/start_fe.sh --daemon
         until mysql -h 127.0.0.1 -P 9030 -u root \
           ${STARROCKS_ROOT_PASSWORD:+-p$$STARROCKS_ROOT_PASSWORD} \
@@ -153,9 +164,14 @@ services:
           cpus: "2.0"
           memory: 2G
     healthcheck:
+      # FE healthcheck handles BOTH auth states:
+      #   - on first boot, root has no password → try without -p
+      #   - after set-starrocks-password.sh runs → try with -p$STARROCKS_ROOT_PASSWORD
+      # The previous version always passed -p, which failed before the password
+      # was applied (chicken-and-egg: FE never went healthy → install hung).
       test:
         - "CMD-SHELL"
-        - "mysql -h 127.0.0.1 -P 9030 -u root ${STARROCKS_ROOT_PASSWORD:+-p$$STARROCKS_ROOT_PASSWORD} -e 'SELECT 1' >/dev/null 2>&1"
+        - "mysql -h 127.0.0.1 -P 9030 -u root -e 'SELECT 1' >/dev/null 2>&1 || mysql -h 127.0.0.1 -P 9030 -u root -p\"$$STARROCKS_ROOT_PASSWORD\" -e 'SELECT 1' >/dev/null 2>&1"
       interval: 10s
       timeout: 5s
       retries: 40
@@ -262,6 +278,7 @@ services:
       AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
       AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_WEBSERVER_SECRET_KEY}
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      PYTHONPATH: /opt/udp_lib:/opt/airflow/dags
       _PIP_ADDITIONAL_REQUIREMENTS: "docker==7.1.0"
       POSTGRES_USER: ${POSTGRES_USER:-iceberg}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -273,7 +290,10 @@ services:
       - ./scripts/airflow-init.sh:/opt/airflow/init.sh:ro
     user: "0:0"
     entrypoint: /bin/bash
-    command: -c "apt-get update >/dev/null && apt-get install -y --no-install-recommends postgresql-client >/dev/null && chmod +x /opt/airflow/init.sh && su airflow -c 'bash /opt/airflow/init.sh'"
+    # Mount is :ro so we cannot chmod +x — invoke via `bash <path>` which
+    # doesn't need the executable bit. apt-get installs postgresql-client
+    # for the psql calls the init script makes against udp-postgres.
+    command: -c "apt-get update >/dev/null && apt-get install -y --no-install-recommends postgresql-client >/dev/null && su airflow -c 'bash /opt/airflow/init.sh'"
 
   airflow-webserver:
     image: apache/airflow:2.10.3-python3.11@sha256:51565d1fbd612e0d759f3ff5b0c38d56130aae15282a753c19aba98a179fc3b5
@@ -295,7 +315,11 @@ services:
       _PIP_ADDITIONAL_REQUIREMENTS: "docker==7.1.0"
     volumes:
       - ./airflow/dags:/opt/airflow/dags:ro
-      - ./udp_core:/opt/airflow/dags/udp_core:ro
+      # udp_core is mounted to a top-level path (not under dags/) to avoid
+      # the Docker Desktop overlayfs "mkdirat: read-only file system" error
+      # when trying to create a subdir inside the image's pre-baked dags/.
+      # PYTHONPATH below makes it importable from the DAGs.
+      - ./udp_core:/opt/udp_lib/udp_core:ro
       - /var/run/docker.sock:/var/run/docker.sock
       - udp_airflow_logs:/opt/airflow/logs
     ports:
@@ -327,10 +351,15 @@ services:
       AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
       AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_WEBSERVER_SECRET_KEY}
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      PYTHONPATH: /opt/udp_lib:/opt/airflow/dags
       _PIP_ADDITIONAL_REQUIREMENTS: "docker==7.1.0"
     volumes:
       - ./airflow/dags:/opt/airflow/dags:ro
-      - ./udp_core:/opt/airflow/dags/udp_core:ro
+      # udp_core is mounted to a top-level path (not under dags/) to avoid
+      # the Docker Desktop overlayfs "mkdirat: read-only file system" error
+      # when trying to create a subdir inside the image's pre-baked dags/.
+      # PYTHONPATH below makes it importable from the DAGs.
+      - ./udp_core:/opt/udp_lib/udp_core:ro
       - /var/run/docker.sock:/var/run/docker.sock
       - udp_airflow_logs:/opt/airflow/logs
     deploy:

@@ -80,7 +80,13 @@ def render_sql_template(roles: dict[str, dict]) -> str:
             f"CREATE USER IF NOT EXISTS '{role}'@'%' IDENTIFIED BY '${{{env_var}}}';"
         )
         for obj in cfg.get("allow", []) or []:
-            lines.append(f"GRANT SELECT ON {obj} TO '{role}'@'%';")
+            # StarRocks 3.x: bare "GRANT SELECT ON <obj>" defaults to TABLE and
+            # fails for views with "cannot find table". The demo policy grants
+            # on views (app_analytics.demo_customer_summary). Until the policy
+            # YAML schema carries an object-type field, default to VIEW because
+            # that's what the analytics layer exposes. For raw tables, change
+            # the GRANT manually or extend the schema (Phase 7).
+            lines.append(f"GRANT SELECT ON VIEW {obj} TO '{role}'@'%';")
         for obj, filt in (cfg.get("row_filters") or {}).items():
             lines.append(f"-- TODO row filter: {role} on {obj} where {filt!r}")
         for obj, masks in (cfg.get("column_masks") or {}).items():

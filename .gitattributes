@@ -1,0 +1,20 @@
+# Force LF line endings on files that run inside Linux containers.
+# Without this, Windows checkouts via autocrlf can break bash/sh inside
+# containers with `$'\r': command not found` and similar.
+#
+# Scope: shell scripts, Python, YAML, SQL, env files.
+
+*.sh        text eol=lf
+*.bash      text eol=lf
+*.py        text eol=lf
+*.yaml      text eol=lf
+*.yml       text eol=lf
+*.sql       text eol=lf
+*.conf      text eol=lf
+*.template  text eol=lf
+*.toml      text eol=lf
+*.json      text eol=lf
+.env*       text eol=lf
+Dockerfile  text eol=lf
+Makefile    text eol=lf
+udp         text eol=lf

@@ -4,8 +4,9 @@
 __pycache__/
 .pytest_cache/
 .DS_Store
-data/
-tmp/
+# Runtime data dirs at repo root only — keep examples/data/ committed.
+/data/
+/tmp/
 backups/
 
 # Rendered template outputs — generated from *.template, never commit.

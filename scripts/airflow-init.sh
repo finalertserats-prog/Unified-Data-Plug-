@@ -1,15 +1,14 @@
-#!/usr/bin/env bash
-# Runs inside the airflow-init container. Idempotent.
+#!/bin/sh
+# Runs inside the airflow-init container. POSIX-compatible — the script gets
+# re-execed by /bin/sh (busybox/dash on minimal images) regardless of shebang
+# when invoked via `su airflow -c 'bash <path>'`, so we avoid bashisms.
 #
 # Responsibilities:
 #   1. Wait for Postgres to accept connections.
-#   2. Create the airflow_meta database if it does not exist (the udp-postgres
-#      service is shared with Iceberg, so we cannot rely on the
-#      docker-entrypoint-initdb.d hook firing on subsequent installs).
-#   3. Run `airflow db migrate` (idempotent — Airflow handles its own
-#      schema-versioning).
+#   2. Create the airflow_meta database if it does not exist.
+#   3. Run `airflow db migrate` (idempotent).
 #   4. Create the admin user if it does not exist.
-set -euo pipefail
+set -eu
 
 : "${POSTGRES_USER:?missing}"
 : "${POSTGRES_PASSWORD:?missing}"

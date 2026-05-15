@@ -3,9 +3,9 @@
 
 -- Role: analyst
 CREATE USER IF NOT EXISTS 'analyst'@'%' IDENTIFIED BY '${STARROCKS_ANALYST_PASSWORD}';
-GRANT SELECT ON app_analytics.demo_customer_summary TO 'analyst'@'%';
+GRANT SELECT ON VIEW app_analytics.demo_customer_summary TO 'analyst'@'%';
 
 -- Role: viewer
 CREATE USER IF NOT EXISTS 'viewer'@'%' IDENTIFIED BY '${STARROCKS_VIEWER_PASSWORD}';
-GRANT SELECT ON app_analytics.demo_customer_summary TO 'viewer'@'%';
+GRANT SELECT ON VIEW app_analytics.demo_customer_summary TO 'viewer'@'%';
 -- TODO row filter: viewer on app_analytics.demo_customer_summary where 'region IS NOT NULL'

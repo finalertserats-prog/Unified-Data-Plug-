@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# See bootstrap.sh — Git Bash on Windows mangles container-side absolute paths
+# unless this is exported.
+export MSYS_NO_PATHCONV=1
+
 UDP_HOME="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$UDP_HOME"
 
