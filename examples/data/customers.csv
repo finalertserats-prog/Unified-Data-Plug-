@@ -1,0 +1,6 @@
+customer_id,customer_name,region,signup_date,order_amount
+1,Alice,India,2026-01-01,1200.50
+2,Bob,USA,2026-01-02,2300.00
+3,Carol,India,2026-01-03,999.99
+4,David,UK,2026-01-04,450.00
+5,Esha,India,2026-01-05,3100.25
