@@ -1,13 +1,35 @@
 #!/usr/bin/env bash
+# Day-to-day UDP CLI. Works in both modes (native systemd / Docker compose).
 set -euo pipefail
 
-if docker compose version >/dev/null 2>&1; then
-  COMPOSE="docker compose"
-elif command -v docker-compose >/dev/null 2>&1; then
-  COMPOSE="docker-compose"
-else
-  COMPOSE=""
-fi
+UDP_HOME="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$UDP_HOME"
+
+# Mode detection: native if systemd unit udp-minio exists, else docker
+detect_mode() {
+  if systemctl list-unit-files 2>/dev/null | grep -q '^udp-minio.service'; then
+    echo native
+  elif command -v docker >/dev/null 2>&1; then
+    echo docker
+  else
+    echo unknown
+  fi
+}
+
+MODE="${UDP_MODE:-$(detect_mode)}"
+
+# Compose CLI helper
+compose_cli() {
+  if docker compose version >/dev/null 2>&1; then
+    docker compose "$@"
+  elif command -v docker-compose >/dev/null 2>&1; then
+    docker-compose "$@"
+  else
+    echo "Docker Compose not found"; exit 1
+  fi
+}
+
+NATIVE_UNITS=(udp-minio udp-hive-metastore udp-starrocks-fe udp-starrocks-be)
 
 cmd="${1:-help}"
 
@@ -16,50 +38,111 @@ case "$cmd" in
     bash scripts/doctor.sh
     ;;
   start)
-    [ -n "$COMPOSE" ] || { echo "Docker Compose not found"; exit 1; }
-    $COMPOSE up -d
+    case "$MODE" in
+      native) systemctl start "${NATIVE_UNITS[@]}" ;;
+      docker) compose_cli up -d ;;
+      *) echo "No install detected. Run: bash install.sh"; exit 1 ;;
+    esac
     ;;
   stop)
-    [ -n "$COMPOSE" ] || { echo "Docker Compose not found"; exit 1; }
-    $COMPOSE down
+    case "$MODE" in
+      native) systemctl stop "${NATIVE_UNITS[@]}" ;;
+      docker) compose_cli --profile ranger --profile hms down ;;
+    esac
     ;;
   restart)
-    [ -n "$COMPOSE" ] || { echo "Docker Compose not found"; exit 1; }
-    $COMPOSE down
-    $COMPOSE up -d
+    case "$MODE" in
+      native) systemctl restart "${NATIVE_UNITS[@]}" ;;
+      docker) compose_cli --profile ranger --profile hms down && compose_cli up -d ;;
+    esac
+    ;;
+  status)
+    case "$MODE" in
+      native) systemctl status "${NATIVE_UNITS[@]}" --no-pager ;;
+      docker) compose_cli ps ;;
+    esac
+    ;;
+  logs)
+    case "$MODE" in
+      native) journalctl -fu "udp-${2:-minio}" ;;
+      docker) compose_cli logs -f "${2:-}" ;;
+    esac
     ;;
   bootstrap)
-    bash scripts/bootstrap.sh
+    case "$MODE" in
+      native) bash scripts/native/08_bootstrap.sh ;;
+      docker) bash scripts/bootstrap.sh ;;
+    esac
     ;;
   smoke-test)
     bash scripts/smoke-test.sh
     ;;
-  status)
-    [ -n "$COMPOSE" ] || { echo "Docker Compose not found"; exit 1; }
-    $COMPOSE ps
+  ranger)
+    if [ "$MODE" != "docker" ]; then
+      echo "Ranger admin currently runs only in docker mode. Run: bash install.sh --mode=docker"
+      exit 1
+    fi
+    sub="${2:-up}"
+    case "$sub" in
+      up)   compose_cli --profile ranger up -d --build ranger-postgres ranger-admin ;;
+      down) compose_cli --profile ranger stop ranger-admin ranger-postgres ;;
+      logs) compose_cli --profile ranger logs -f ranger-admin ;;
+      *) echo "Usage: ./udp ranger [up|down|logs]"; exit 1 ;;
+    esac
     ;;
-  logs)
-    [ -n "$COMPOSE" ] || { echo "Docker Compose not found"; exit 1; }
-    $COMPOSE logs -f "${2:-}"
+  hms|hive)
+    # Hive Metastore (and its postgres) are opt-in via the `hms` compose
+    # profile. Spark's default `udp` catalog uses REST; bring HMS up only
+    # if you want to use the `udp_hms` Spark catalog or share metadata
+    # with other Hive-aware engines (Trino, Hue, Ranger, etc.).
+    if [ "$MODE" != "docker" ]; then
+      echo "Hive Metastore management is docker-only. Run: bash install.sh --mode=docker"
+      exit 1
+    fi
+    sub="${2:-up}"
+    case "$sub" in
+      up)   compose_cli --profile hms up -d hms-postgres hive-metastore ;;
+      down) compose_cli --profile hms stop hive-metastore hms-postgres ;;
+      logs) compose_cli --profile hms logs -f hive-metastore ;;
+      *) echo "Usage: ./udp hms [up|down|logs]"; exit 1 ;;
+    esac
     ;;
   clean)
-    [ -n "$COMPOSE" ] || { echo "Docker Compose not found"; exit 1; }
-    $COMPOSE down -v
+    case "$MODE" in
+      native)
+        systemctl stop "${NATIVE_UNITS[@]}" 2>/dev/null || true
+        for u in "${NATIVE_UNITS[@]}"; do systemctl disable "$u" 2>/dev/null || true; done
+        echo "Stopped and disabled native units. Data preserved in /var/lib/udp."
+        ;;
+      docker)
+        # Include every profile so optional services + their volumes
+        # are also reaped (otherwise they'd be orphaned).
+        compose_cli --profile ranger --profile hms down -v
+        ;;
+    esac
+    ;;
+  mode)
+    echo "$MODE"
     ;;
   help|*)
-    cat <<'EOF'
-Unified Data Plug CLI
+    cat <<EOF
+Unified Data Plug CLI (mode: ${MODE})
 
 Commands:
-  ./udp doctor       Check host requirements
-  ./udp start        Start UDP stack
-  ./udp stop         Stop UDP stack
-  ./udp restart      Restart UDP stack
-  ./udp bootstrap    Create demo raw, curated, and app analytics layer
-  ./udp smoke-test   Validate end-to-end lakehouse readiness
-  ./udp status       Show container status
-  ./udp logs         Tail logs
-  ./udp clean        Stop and remove volumes
+  ./udp doctor          Check host requirements
+  ./udp start           Start core UDP stack (MinIO + Iceberg-REST + Spark + StarRocks)
+  ./udp stop            Stop UDP stack
+  ./udp restart         Restart UDP stack
+  ./udp bootstrap       Create demo raw, curated, and app analytics layer
+  ./udp smoke-test      Validate end-to-end lakehouse readiness
+  ./udp hms up          Start optional Hive Metastore (HMS-backed Iceberg catalog, docker mode only)
+  ./udp ranger up       Start optional Apache Ranger admin (docker mode only)
+  ./udp status          Show service / container status
+  ./udp logs [name]     Tail logs
+  ./udp clean           Stop services (and remove volumes in docker mode)
+  ./udp mode            Print the detected install mode (native|docker)
+
+Override mode: UDP_MODE=native ./udp status
 EOF
     ;;
 esac

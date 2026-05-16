@@ -1,3 +1,6 @@
+# Starter policy for the demo app analytics layer.
+# UDP v0.3 ships this as policy-as-code. With ./udp ranger up running,
+# import the equivalent JSON via Ranger admin → Import Policies.
 policy: demo_public_analytics
 description: Demo policy for app analytics layer
 roles:

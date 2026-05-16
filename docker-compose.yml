@@ -35,6 +35,55 @@ services:
       echo 'MinIO bucket ready';
       "
 
+  hms-postgres:
+    image: postgres:16-alpine
+    container_name: udp-hms-postgres
+    hostname: hms-postgres
+    profiles: ["hms"]
+    env_file:
+      - .env
+    environment:
+      POSTGRES_USER: ${HMS_DB_USER}
+      POSTGRES_PASSWORD: ${HMS_DB_PASSWORD}
+      POSTGRES_DB: ${HMS_DB_NAME}
+    volumes:
+      - udp_hms_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${HMS_DB_USER} -d $${HMS_DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  hive-metastore:
+    image: apache/hive:4.0.0
+    container_name: udp-hive-metastore
+    hostname: hive-metastore
+    profiles: ["hms"]
+    depends_on:
+      hms-postgres:
+        condition: service_healthy
+      create-bucket:
+        condition: service_completed_successfully
+    env_file:
+      - .env
+    environment:
+      SERVICE_NAME: metastore
+      DB_DRIVER: postgres
+      SERVICE_OPTS: >-
+        -Djavax.jdo.option.ConnectionDriverName=org.postgresql.Driver
+        -Djavax.jdo.option.ConnectionURL=jdbc:postgresql://hms-postgres:5432/${HMS_DB_NAME}
+        -Djavax.jdo.option.ConnectionUserName=${HMS_DB_USER}
+        -Djavax.jdo.option.ConnectionPassword=${HMS_DB_PASSWORD}
+    ports:
+      - "9083:9083"
+    volumes:
+      - ./config/hive/hive-site.xml:/opt/hive/conf/hive-site.xml
+    healthcheck:
+      test: ["CMD-SHELL", "ss -ltn 2>/dev/null | grep -q ':9083' || netstat -ltn 2>/dev/null | grep -q ':9083'"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
   iceberg-rest:
     image: tabulario/iceberg-rest:1.6.0
     container_name: udp-iceberg-rest
@@ -53,15 +102,24 @@ services:
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
       AWS_REGION: ${AWS_REGION}
+    # The tabulario/iceberg-rest image doesn't ship wget; use a pure-bash
+    # TCP probe instead (avoids "executable file not found" healthcheck loops).
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8181/v1/config"]
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/8181 && echo > /dev/null || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 30
 
   spark:
-    image: tabulario/spark-iceberg:3.5.1_1.5.2
+    # Bumped from 3.5.1_1.5.2 (which was removed from Docker Hub) to a tag
+    # that exists. Both upstream versions are GA.
+    image: tabulario/spark-iceberg:3.5.5_1.8.1
     container_name: udp-spark
+    # hive-metastore moved to the `hms` profile, so spark must not hard-depend
+    # on it (default `docker compose up` would still pull it in via deps).
+    # If you start the stack with `--profile hms`, hive-metastore comes up
+    # and Spark can use the udp (HMS-backed) catalog as before. Without
+    # the profile, Spark only uses udp_rest (REST-backed).
     depends_on:
       iceberg-rest:
         condition: service_healthy
@@ -80,13 +138,34 @@ services:
       - ./config/spark/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
 
   starrocks-fe:
-    image: starrocks/fe-ubuntu:3.3-latest
+    # 3.3.12 includes PR #55416 which fixes Iceberg REST catalog property
+    # propagation to S3 FileIO. Earlier 3.3.x ignored aws.s3.endpoint when
+    # querying Iceberg tables on non-AWS S3-compatible stores like MinIO.
+    image: starrocks/fe-ubuntu:3.3.12
     container_name: udp-starrocks-fe
     hostname: starrocks-fe
+    env_file:
+      - .env
     command:
       - /bin/bash
       - -c
       - |
+        # priority_networks is required on Docker networks where the FE's
+        # IP may differ between restarts (e.g. Docker Desktop). Without it,
+        # FE refuses to elect itself leader and stays in INIT forever — the
+        # MySQL port 9030 never binds.
+        echo "priority_networks = 172.16.0.0/12" >> /opt/starrocks/fe/conf/fe.conf
+        # AWS SDK env vars: needed because StarRocks (both FE and BE) honors
+        # them in addition to catalog properties when constructing its
+        # internal S3 client. Required for querying Iceberg-on-MinIO via the
+        # iceberg_rest_catalog. AWS_S3_US_EAST_1_REGIONAL_ENDPOINT=regional
+        # disables the SDK's us-east-1 "global" special-case which otherwise
+        # routes to s3.amazonaws.com regardless of endpoint URL.
+        export AWS_REGION="${AWS_REGION:-us-east-1}"
+        export AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}"
+        export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}"
+        export AWS_ENDPOINT_URL_S3="${S3_ENDPOINT:-http://minio:9000}"
+        export AWS_S3_US_EAST_1_REGIONAL_ENDPOINT=regional
         /opt/starrocks/fe/bin/start_fe.sh --daemon
         until mysql -h 127.0.0.1 -P 9030 -u root -e "SELECT 1" >/dev/null 2>&1; do sleep 2; done
         sleep infinity
@@ -103,9 +182,12 @@ services:
       retries: 40
 
   starrocks-be:
-    image: starrocks/be-ubuntu:3.3-latest
+    # 3.3.12: see starrocks-fe note above for PR #55416 rationale.
+    image: starrocks/be-ubuntu:3.3.12
     container_name: udp-starrocks-be
     hostname: starrocks-be
+    env_file:
+      - .env
     depends_on:
       starrocks-fe:
         condition: service_healthy
@@ -114,6 +196,15 @@ services:
       - -c
       - |
         echo "priority_networks = 172.16.0.0/12" >> /opt/starrocks/be/conf/be.conf
+        # AWS SDK env vars: BE makes the actual S3 reads during query
+        # execution. Without these the SDK falls back to its default chain
+        # (env vars, then IMDS, then ~/.aws/) and either fails to find a
+        # region/credentials or routes to s3.amazonaws.com instead of MinIO.
+        export AWS_REGION="${AWS_REGION:-us-east-1}"
+        export AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}"
+        export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}"
+        export AWS_ENDPOINT_URL_S3="${S3_ENDPOINT:-http://minio:9000}"
+        export AWS_S3_US_EAST_1_REGIONAL_ENDPOINT=regional
         /opt/starrocks/be/bin/start_be.sh --daemon
         sleep infinity
     ports:
@@ -129,7 +220,50 @@ services:
       timeout: 5s
       retries: 40
 
+  ranger-postgres:
+    image: postgres:16-alpine
+    container_name: udp-ranger-postgres
+    hostname: ranger-postgres
+    profiles: ["ranger"]
+    env_file:
+      - .env
+    environment:
+      POSTGRES_USER: ${RANGER_DB_USER}
+      POSTGRES_PASSWORD: ${RANGER_DB_PASSWORD}
+      POSTGRES_DB: ${RANGER_DB_NAME}
+    volumes:
+      - udp_ranger_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${RANGER_DB_USER} -d $${RANGER_DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  ranger-admin:
+    build:
+      context: ./services/ranger
+      dockerfile: Dockerfile
+    image: udp/ranger-admin:2.4.0
+    container_name: udp-ranger-admin
+    hostname: ranger-admin
+    profiles: ["ranger"]
+    depends_on:
+      ranger-postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      RANGER_DB_HOST: ranger-postgres
+      RANGER_DB_NAME: ${RANGER_DB_NAME}
+      RANGER_DB_USER: ${RANGER_DB_USER}
+      RANGER_DB_PASSWORD: ${RANGER_DB_PASSWORD}
+      RANGER_ADMIN_PASSWORD: ${RANGER_ADMIN_PASSWORD}
+    ports:
+      - "6080:6080"
+
 volumes:
   udp_minio_data:
+  udp_hms_postgres_data:
   udp_starrocks_fe_meta:
   udp_starrocks_be_storage:
+  udp_ranger_postgres_data:

@@ -2,8 +2,8 @@ CREATE EXTERNAL CATALOG iceberg_catalog
 PROPERTIES
 (
     "type" = "iceberg",
-    "iceberg.catalog.type" = "rest",
-    "iceberg.catalog.uri" = "http://iceberg-rest:8181",
+    "iceberg.catalog.type" = "hive",
+    "hive.metastore.uris" = "thrift://hive-metastore:9083",
     "aws.s3.endpoint" = "http://minio:9000",
     "aws.s3.access_key" = "admin",
     "aws.s3.secret_key" = "udp_admin_12345",

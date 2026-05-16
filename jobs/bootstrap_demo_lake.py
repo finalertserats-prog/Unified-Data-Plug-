@@ -14,7 +14,7 @@ df = (
     spark.read
     .option("header", True)
     .option("inferSchema", True)
-    .csv("/home/iceberg/examples/data/customers.csv")
+    .csv("/home/iceberg/examples/customers.csv")
     .withColumn("ingestion_timestamp", current_timestamp())
     .withColumn("source_system", lit("udp_demo"))
     .withColumn("batch_id", lit("demo_bootstrap"))
