@@ -14,8 +14,8 @@ The native mode is what most teams want for a real server install. The Docker mo
 ## One-command install
 
 ```bash
-git clone https://github.com/finalertserats-prog/Unified-Data-Plug-.git
-cd Unified-Data-Plug-
+git clone https://github.com/finalertserats-prog/Unified-Data-Plug.git
+cd Unified-Data-Plug
 
 # Native (Ubuntu/Debian, single server, requires sudo):
 sudo bash install.sh --mode=native
@@ -33,13 +33,13 @@ bash install.sh
 |---|---|---|
 | Object storage | MinIO | ✓ |
 | Table format | Apache Iceberg | ✓ |
-| Catalog (default) | Hive Metastore (+Postgres) | ✓ |
-| Catalog (secondary) | Iceberg REST | docker mode only (v0.4) |
+| Catalog (default) | Iceberg REST | ✓ |
+| Catalog (opt-in) | Hive Metastore (+Postgres) | docker: `./udp hms up` |
 | Processing | Spark | ✓ |
-| Serving | StarRocks (FE+BE) | ✓ |
-| Governance (opt-in) | Apache Ranger | docker mode only (v0.4) |
+| Serving | StarRocks 3.3.12 (FE+BE) | ✓ |
+| Governance (opt-in) | Apache Ranger | docker: `./udp ranger up` |
 
-Native install in v0.4 ships HMS-only. Adding the REST catalog and Ranger to native install is on the roadmap.
+**Docker mode profiles:** the core stack (MinIO + Iceberg REST + Spark + StarRocks) comes up with `./udp start`. Hive Metastore and Apache Ranger are opt-in via compose profiles — start them with `./udp hms up` or `./udp ranger up`. This keeps the cold-start RAM footprint small (the core stack fits in 16 GB; HMS + Ranger add several more services).
 
 ## What native install does
 

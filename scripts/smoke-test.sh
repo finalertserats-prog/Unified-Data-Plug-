@@ -30,7 +30,14 @@ case "$MODE" in
     "
     ;;
   docker)
-    bash scripts/wait-for.sh "Hive Metastore" docker exec udp-hive-metastore /bin/sh -c "ss -ltn 2>/dev/null | grep -q ':9083' || netstat -ltn 2>/dev/null | grep -q ':9083'"
+    # hive-metastore is now opt-in via the `hms` compose profile. Only wait
+    # on it if it's actually running.
+    hms_running=$(docker ps --filter "name=udp-hive-metastore" -q 2>/dev/null | head -1)
+    if [ -n "$hms_running" ]; then
+      bash scripts/wait-for.sh "Hive Metastore" docker exec udp-hive-metastore /bin/sh -c "ss -ltn 2>/dev/null | grep -q ':9083' || netstat -ltn 2>/dev/null | grep -q ':9083'"
+    else
+      echo "  (hive-metastore not running — skipping HMS wait)"
+    fi
     bash scripts/wait-for.sh "Iceberg REST" curl -fsS http://localhost:8181/v1/config
     bash scripts/wait-for.sh "StarRocks FE" docker exec udp-starrocks-fe mysql -h 127.0.0.1 -P 9030 -u root -e "SELECT 1"
 

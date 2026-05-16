@@ -47,13 +47,13 @@ case "$cmd" in
   stop)
     case "$MODE" in
       native) systemctl stop "${NATIVE_UNITS[@]}" ;;
-      docker) compose_cli down ;;
+      docker) compose_cli --profile ranger --profile hms down ;;
     esac
     ;;
   restart)
     case "$MODE" in
       native) systemctl restart "${NATIVE_UNITS[@]}" ;;
-      docker) compose_cli down && compose_cli up -d ;;
+      docker) compose_cli --profile ranger --profile hms down && compose_cli up -d ;;
     esac
     ;;
   status)
@@ -90,6 +90,23 @@ case "$cmd" in
       *) echo "Usage: ./udp ranger [up|down|logs]"; exit 1 ;;
     esac
     ;;
+  hms|hive)
+    # Hive Metastore (and its postgres) are opt-in via the `hms` compose
+    # profile. Spark's default `udp` catalog uses REST; bring HMS up only
+    # if you want to use the `udp_hms` Spark catalog or share metadata
+    # with other Hive-aware engines (Trino, Hue, Ranger, etc.).
+    if [ "$MODE" != "docker" ]; then
+      echo "Hive Metastore management is docker-only. Run: bash install.sh --mode=docker"
+      exit 1
+    fi
+    sub="${2:-up}"
+    case "$sub" in
+      up)   compose_cli --profile hms up -d hms-postgres hive-metastore ;;
+      down) compose_cli --profile hms stop hive-metastore hms-postgres ;;
+      logs) compose_cli --profile hms logs -f hive-metastore ;;
+      *) echo "Usage: ./udp hms [up|down|logs]"; exit 1 ;;
+    esac
+    ;;
   clean)
     case "$MODE" in
       native)
@@ -98,7 +115,9 @@ case "$cmd" in
         echo "Stopped and disabled native units. Data preserved in /var/lib/udp."
         ;;
       docker)
-        compose_cli --profile ranger down -v
+        # Include every profile so optional services + their volumes
+        # are also reaped (otherwise they'd be orphaned).
+        compose_cli --profile ranger --profile hms down -v
         ;;
     esac
     ;;
@@ -111,11 +130,12 @@ Unified Data Plug CLI (mode: ${MODE})
 
 Commands:
   ./udp doctor          Check host requirements
-  ./udp start           Start core UDP stack
+  ./udp start           Start core UDP stack (MinIO + Iceberg-REST + Spark + StarRocks)
   ./udp stop            Stop UDP stack
   ./udp restart         Restart UDP stack
   ./udp bootstrap       Create demo raw, curated, and app analytics layer
   ./udp smoke-test      Validate end-to-end lakehouse readiness
+  ./udp hms up          Start optional Hive Metastore (HMS-backed Iceberg catalog, docker mode only)
   ./udp ranger up       Start optional Apache Ranger admin (docker mode only)
   ./udp status          Show service / container status
   ./udp logs [name]     Tail logs
